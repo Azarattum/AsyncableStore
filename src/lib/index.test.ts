@@ -278,7 +278,7 @@ describe("asyncable", () => {
     const dependency = writable(0);
     const store = asyncable(dependency, getter, setter);
 
-    expect(get(store)).resolves.toBe(0);
+    expect(await get(store)).toBe(0);
     await store.set(1);
 
     expect(getter).toBeCalledTimes(1);

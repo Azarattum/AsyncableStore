@@ -5,6 +5,7 @@
     "dev": "svelte-kit dev",
     "package": "svelte-kit package",
     "preview": "svelte-kit preview",
+    "sync": "svelte-kit sync",
     "test": "jest",
     "coverage": "jest --coverage"
   },

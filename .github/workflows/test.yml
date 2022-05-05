@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test & Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: "17.9"
+
+      - name: Prepare
+        run: npm install
+
+      - name: Sync
+        run: npm run-script sync
+
+      - name: Test
+        run: npm run-script test
+
+      - name: Package
+        run: npm run-script package
