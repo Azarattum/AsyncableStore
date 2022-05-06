@@ -3,7 +3,7 @@ import { asyncable, ready } from "./index";
 
 function mock<T>(data: T, time = 0) {
   let calls = 0;
-  return jest.fn(async () => {
+  return jest.fn<Promise<T extends Array<infer U> ? U : T>, []>(async () => {
     if (time) await new Promise((r) => setTimeout(r, time));
     if (Array.isArray(data)) return data[calls++];
     return data;
@@ -127,7 +127,6 @@ describe("asyncable", () => {
     const syncDep = writable(1);
     const asyncDep = asyncable(
       () => 2,
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {}
     );
 
@@ -283,5 +282,166 @@ describe("asyncable", () => {
 
     expect(getter).toBeCalledTimes(1);
     expect(setter).toBeCalledTimes(1);
+  });
+
+  it("reflections", async () => {
+    let counter = 0;
+    const getter = mock([2, 3, 3]);
+    const store1 = asyncable(getter);
+    const store2 = asyncable(
+      [store1, true],
+      (_, [number]) => {
+        counter++;
+        return number * number;
+      },
+      () => {}
+    );
+
+    expect(await get(store1)).toBe(2);
+    expect(await get(store2)).toBe(4);
+    expect(getter).toBeCalledTimes(1);
+    expect(counter).toBe(1);
+    await store2.set(9);
+    expect(getter).toBeCalledTimes(2);
+    expect(await get(store1)).toBe(3);
+    expect(getter).toBeCalledTimes(3);
+    expect(await get(store2)).toBe(9);
+    expect(counter).toBe(2);
+  });
+
+  it("complex scenario", async () => {
+    // === Helpers ===
+    let calls = 0;
+    const order = [
+      //Initial load
+      "personalization",
+      "suggest",
+      "favorites",
+      "suggested",
+      "blogs",
+      "previews",
+      //Set the value of favorites
+      "set favorites",
+      //Updates caused by reflection
+      "personalization",
+      "favorites",
+      "suggested",
+      "blogs",
+      "previews",
+      //Disable suggestions
+      "blogs",
+      "previews",
+    ];
+    const check = (name: string) => {
+      expect(order[calls++]).toBe(name);
+    };
+    const api = <T>(data: T, name: string) => {
+      const getter = mock(data);
+      return (signal: any, [token]: any) => {
+        check(name);
+        expect(signal).toBeInstanceOf(AbortSignal);
+        expect(token).toBe("token");
+        return getter();
+      };
+    };
+
+    // === Stores ===
+    const token = asyncable(mock("token"));
+    const suggest = asyncable(token, api(true, "suggest"), () => {});
+
+    const personalization = asyncable(
+      token,
+      api(
+        [
+          {
+            favorites: ["1f", "2f"],
+            suggested: ["1s"],
+          },
+          {
+            favorites: ["1u"],
+            suggested: ["1s", "2s"],
+          },
+        ],
+        "personalization"
+      )
+    );
+
+    const favorites = asyncable(
+      [personalization, true],
+      (_, [personalization]) => {
+        check("favorites");
+        return personalization.favorites;
+      },
+      (_, [value, old]) => {
+        check("set favorites");
+        expect(value).toEqual(["1f"]);
+        expect(old).toEqual(["1f", "2f"]);
+        return ["1c"];
+      }
+    );
+
+    const suggested = asyncable(personalization, (_, [personalization]) => {
+      check("suggested");
+      return personalization.suggested;
+    });
+
+    const blogs = asyncable(
+      [favorites, suggest, suggested],
+      (_, [favorites, suggest, suggested]) => {
+        check("blogs");
+        let blogs = favorites;
+        if (suggest) blogs = blogs.concat(suggested);
+        return blogs;
+      }
+    );
+
+    const previews = asyncable(blogs, async (_, [blogs]) => {
+      check("previews");
+      const previews = {} as Record<string, string>;
+      await Promise.all(
+        blogs.map(async (x) => {
+          previews[x] = await mock(`preview-${x}`)();
+        })
+      );
+
+      return previews;
+    });
+
+    // === Usage ===
+    // Just render
+    const $blogs = get(blogs);
+    expect(!ready($blogs));
+    expect(await $blogs).toEqual(["1f", "2f", "1s"]);
+
+    for (const blog of await $blogs) {
+      expect((await get(previews))[blog]).toBe(`preview-${blog}`);
+    }
+
+    // Watch previews
+    const counter = jest.fn();
+    previews.subscribe(counter);
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Update favorites
+    await favorites.update((x) => x?.filter((y) => y != "2f"));
+    expect(get(favorites).valueOf()).toEqual(["1c"]);
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(get(favorites).valueOf()).toEqual(["1u"]);
+    expect(get(previews)).toEqual({
+      "1u": "preview-1u",
+      "1s": "preview-1s",
+      "2s": "preview-2s",
+    });
+    expect(counter).toBeCalledTimes(3);
+
+    // Disable suggestions
+    await suggest.set(false);
+    expect(counter).toBeCalledTimes(4);
+    expect(await get(previews)).toEqual({ "1u": "preview-1u" });
+    expect(get(previews)).toEqual({ "1u": "preview-1u" });
+    expect(counter).toBeCalledTimes(5);
+
+    expect(calls).toBe(order.length);
   });
 });
