@@ -1,5 +1,5 @@
 {
-  "name": "store-asyncable",
+  "name": "asyncable-store",
   "version": "1.0.0",
   "scripts": {
     "dev": "svelte-kit dev",
