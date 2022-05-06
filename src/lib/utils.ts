@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function */
 import type { Readable } from "svelte/store";
 import type {
   ExtendedPromise,
@@ -68,15 +67,17 @@ export function parse(dependencies: Stores) {
     dependencies = [dependencies] as Stores;
   }
 
-  const reflections = new Map<Readable<any>, boolean>();
   const stores: Readable<any>[] = [];
+  const reflections: { update: () => Promise<void> | void }[] = [];
   for (const dependency of dependencies as Store[]) {
     let store = dependency as Readable<any>;
     let reflect = false;
     if (Array.isArray(dependency)) [store, reflect] = dependency;
 
     stores.push(store);
-    reflections.set(store, reflect);
+    if (reflect && typeof (store as any).update === "function") {
+      reflections.push(store as any);
+    }
   }
 
   return { stores, reflections };

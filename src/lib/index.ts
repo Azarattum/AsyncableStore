@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function */
 import { enrich, parse, promise, ready } from "./utils";
 import { get, derived, writable } from "svelte/store";
 import type {
@@ -45,10 +44,9 @@ function asyncable<T, S extends Stores>(a: any, b?: any, c?: any) {
   const refresh = async (values?: any[]) => {
     if (setting.state === "pending") return setting.value;
 
-    let force = false;
     if (!values) {
       values = parents || get(listener);
-      force = true;
+      parents = undefined;
     }
 
     const loader = promise<T>();
@@ -60,7 +58,7 @@ function asyncable<T, S extends Stores>(a: any, b?: any, c?: any) {
       const awaited = (await Promise.all(values)) as AwaitedValues<S>;
       if (loader.state === "adopted") return loader.value;
 
-      if (force || JSON.stringify(awaited) !== JSON.stringify(parents)) {
+      if (JSON.stringify(awaited) !== JSON.stringify(parents)) {
         const updated = await getter(loader.signal, awaited);
         if ((loader.state as any) === "adopted") return loader.value;
         parents = awaited;
@@ -102,6 +100,10 @@ function asyncable<T, S extends Stores>(a: any, b?: any, c?: any) {
       if (data != null && value !== data) {
         value = data;
         store.set(enrich(Promise.resolve(value), value));
+      }
+      //Reflect changes
+      if (JSON.stringify(value) != JSON.stringify(previous)) {
+        reflections.map((x) => x.update());
       }
     } catch (error) {
       //Revert optimistic update

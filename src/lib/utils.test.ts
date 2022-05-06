@@ -75,32 +75,36 @@ describe("dependencies parse", () => {
     const { stores, reflections } = parse(a);
     expect(stores.length).toBe(1);
     expect(stores[0]).toBe(a);
-    expect(reflections.size).toBe(1);
-    expect(reflections.get(a)).toBe(false);
+    expect(reflections.length).toBe(0);
   });
 
   it("single reflection", async () => {
-    const a = {} as any;
+    const a = { update: () => "" } as any;
     const { stores, reflections } = parse([a, true]);
     expect(stores.length).toBe(1);
     expect(stores[0]).toBe(a);
-    expect(reflections.size).toBe(1);
-    expect(reflections.get(a)).toBe(true);
+    expect(reflections.length).toBe(1);
+    expect(reflections[0]).toBe(a);
   });
 
   it("combined array", async () => {
     const a = {} as any;
     const b = {} as any;
-    const c = {} as any;
+    const c = { update: () => "" } as any;
+    const d = {} as any;
 
-    const { stores, reflections } = parse([a, [b, false], [c, true]]);
-    expect(stores.length).toBe(3);
+    const { stores, reflections } = parse([
+      a,
+      [b, false],
+      [c, true],
+      [d, true],
+    ]);
+    expect(stores.length).toBe(4);
     expect(stores[0]).toBe(a);
     expect(stores[1]).toBe(b);
     expect(stores[2]).toBe(c);
-    expect(reflections.size).toBe(3);
-    expect(reflections.get(a)).toBe(false);
-    expect(reflections.get(b)).toBe(false);
-    expect(reflections.get(c)).toBe(true);
+    expect(stores[3]).toBe(d);
+    expect(reflections.length).toBe(1);
+    expect(reflections[0]).toBe(c);
   });
 });
