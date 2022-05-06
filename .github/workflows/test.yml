@@ -19,13 +19,18 @@ jobs:
           node-version: "17.9"
 
       - name: Prepare
-        run: npm install
-
-      - name: Sync
-        run: npm run-script sync
+        run: |
+          npm install
+          npm run-script sync
 
       - name: Test
         run: npm run-script test
 
-      - name: Package
-        run: npm run-script package
+      - name: Build
+        run: npm run-script build
+
+      - name: Publish
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build
