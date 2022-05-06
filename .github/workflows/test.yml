@@ -27,6 +27,8 @@ jobs:
         run: npm run-script test
 
       - name: Build
+        env:
+          APP_BASE: /${{ github.event.repository.name }}
         run: npm run-script build
 
       - name: Publish
